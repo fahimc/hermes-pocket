@@ -1,0 +1,12 @@
+.cache/
+.tmp/
+src/
+data/.env
+data/config.yaml
+data/auth.json
+data/sessions/
+data/memories/
+data/skills/
+data/logs/
+data/state.db*
+
