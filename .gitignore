@@ -1,5 +1,6 @@
 .cache/
 .tmp/
+artifacts/
 src/
 data/.env
 data/config.yaml
@@ -9,4 +10,3 @@ data/memories/
 data/skills/
 data/logs/
 data/state.db*
-
