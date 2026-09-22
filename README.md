@@ -13,17 +13,17 @@ This project is a clean launcher and runtime bootstrap inspired by the public
 4. Put one or more `.gguf` files in `model\` or `models\`. With one file, it is selected automatically; with multiple files, the launcher shows a menu.
 5. Hermes Pocket starts the local llama.cpp server, updates `data\config.yaml`, and then launches Hermes against that model.
 
-The first setup downloads roughly 600 MB–1 GB depending on dependency and browser caches. Later launches use only the portable folder.
+The first setup downloads roughly 1–1.6 GB when the CUDA bundle is enabled (less in CPU-only mode), depending on dependency and browser caches. Later launches use only the portable folder.
 
 ## Local llama.cpp / Llama Pocket
 
-Hermes Agent cannot consume a `.gguf` file as a model endpoint by itself. Hermes Pocket therefore downloads the official CPU `llama-server.exe` once, scans the portable model folders, starts a server for the selected model on a free localhost port, and writes the custom OpenAI-compatible provider into `data\config.yaml` before starting Hermes. When Hermes exits, the launcher stops only the server process it started.
+Hermes Agent cannot consume a `.gguf` file as a model endpoint by itself. Hermes Pocket therefore downloads the official `llama-server.exe` bundle once, scans the portable model folders, starts a server for the selected model on a free localhost port, and writes the custom OpenAI-compatible provider into `data\config.yaml` before starting Hermes. When Hermes exits, the launcher stops only the server process it started. On a CUDA-capable NVIDIA machine, the default config downloads and uses the CUDA 13.3 x64 bundle; the CPU bundle remains available as a fallback.
 
 Environment overrides:
 
 - `HERMES_MODELS_DIR`: scan a different model directory instead of the portable `model\` and `models\` folders.
 - `HERMES_MODEL`: select a specific filename without showing the menu.
-- `hermes-pocket.json`: root config file. Set `model_directory` and `context_size` here; the default is `model` and 65536 tokens. Hermes currently requires at least 64000 tokens for the main agent model.
+- `hermes-pocket.json`: root config file. Set `model_directory` and `context_size` here; the default is `model` and 65536 tokens. Hermes currently requires at least 64000 tokens for the main agent model. GPU settings are `use_gpu`, `gpu_backend`, `gpu_layers`, `flash_attention`, `parallel`, and `gpu_fallback_to_cpu`. Set `use_gpu` to `false` for CPU-only mode. `parallel: 1` is intentional for a 64k context because each additional slot increases KV-cache memory.
 - `HERMES_CONTEXT_SIZE`: temporary environment override when no `context_size` is set in the root config.
 
 This also works with a running Llama Pocket/llama.cpp server if you configure Hermes manually, but the default launch path is now fully local and model-folder driven.

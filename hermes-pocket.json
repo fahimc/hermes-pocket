@@ -1,4 +1,10 @@
 {
   "model_directory": "model",
-  "context_size": 65536
+  "context_size": 65536,
+  "use_gpu": true,
+  "gpu_backend": "cuda",
+  "gpu_layers": "all",
+  "flash_attention": true,
+  "parallel": 1,
+  "gpu_fallback_to_cpu": true
 }

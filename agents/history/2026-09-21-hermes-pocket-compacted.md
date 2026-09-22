@@ -20,6 +20,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Added reset support, example environment configuration, notices, and security guidance.
 - Added automatic GGUF discovery from the portable `model/` or `models/` folder, interactive selection when multiple files exist, and a root `hermes-pocket.json` config.
 - Added a pinned CPU llama.cpp server bootstrap and launcher lifecycle scripts that write Hermes' custom `/v1` endpoint before launch and stop only the tracked server afterward.
+- Added config-driven CUDA support: the launcher downloads the official llama.cpp CUDA 13.3 x64 and cudart bundles into `.cache`, starts CUDA with all GPU layers, flash attention, one parallel slot, and falls back to the CPU bundle when configured.
 - Created and pushed the public GitHub repository.
 
 ## Verification
@@ -28,6 +29,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Bootstrap archive created successfully; no user credentials or hydrated runtime files are included.
 - With `model/Spark-X2.5-4B-Q4_K_M.gguf`, model discovery, llama-server startup, config generation, and tracked-process cleanup all passed.
 - `hermes-pocket.json` default `context_size: 65536` is written into Hermes config; the earlier 8192-token setting was rejected by Hermes' 64000-token minimum.
+- The CUDA server started successfully for `Spark-X2.5-4B-Q4_K_M.gguf` with `context_size: 65536`, `parallel: 1`, `--n-gpu-layers all`, and `--flash-attn on`; a direct 16-token request measured about 82 tokens/second on the RTX 3060.
 
 ## Release
 
@@ -35,14 +37,15 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Release: https://github.com/fahimc/hermes-pocket/releases/tag/v0.1.0
 - Asset: `HermesPocket-win-x64.zip` (bootstrap folder, first-run setup required)
 - Follow-up release: `v0.2.0` adds model-folder discovery, local llama.cpp startup, and root context configuration.
+- Pending release: `v0.3.0` adds config-driven CUDA installation and GPU launch settings.
 
 ## Known limitations
 
 - Only the Windows x64 bootstrap path was validated in this environment.
 - First-run setup needs internet access and downloads hundreds of megabytes of runtimes and packages.
 - The release is a folder/launcher, not a single native executable, because Hermes depends on Python, Node, browser tooling, and its own source tree.
-- A full agent response at 65536 context was not completed in this environment because CPU inference on the 4B model exceeded the interactive test window; server readiness and config wiring passed.
+- A full agent response at 65536 context was not completed in this environment because a reasoning-heavy CPU inference run exceeded the interactive test window; CUDA server readiness, GPU launch flags, and a direct short request passed.
 
 ## Resume point
 
-For the next iteration, optimize CPU defaults or add a GPU backend option, run a full 64k-context Hermes chat on suitable hardware, and add a cross-platform Unix launcher if needed.
+For the next iteration, run a full 64k-context Hermes chat on suitable hardware, confirm the public v0.3.0 bootstrap asset, and add a cross-platform Unix launcher if needed.

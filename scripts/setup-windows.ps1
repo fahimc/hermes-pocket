@@ -22,7 +22,6 @@ $nodeUrl = "https://nodejs.org/dist/v22.22.3/node-v22.22.3-win-x64.zip"
 $uvUrl = "https://github.com/astral-sh/uv/releases/download/0.11.19/uv-x86_64-pc-windows-msvc.zip"
 $rgUrl = "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-pc-windows-msvc.zip"
 $gitUrl = "https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/MinGit-2.54.0-64-bit.zip"
-$llamaUrl = "https://github.com/ggml-org/llama.cpp/releases/download/b10938/llama-b10938-bin-win-cpu-x64.zip"
 $hermesCommit = "743ee72596e7a9f23bc7cd5c570a6ebd958043e4"
 $hermesUrl = "https://github.com/NousResearch/hermes-agent/archive/$hermesCommit.zip"
 
@@ -91,11 +90,9 @@ Move-FirstDirectoryContents (Join-Path $tempRoot "node") (Join-Path $runtimeRoot
 if ($LASTEXITCODE -ne 0) { throw "Node.js verification failed." }
 Write-Ok "Node.js ready"
 
-Write-Step "llama.cpp CPU server"
-$llamaArchive = Join-Path $downloadRoot "llama-b10938-bin-win-cpu-x64.zip"
-Download-Asset $llamaUrl $llamaArchive
-Extract-Zip $llamaArchive (Join-Path $runtimeRoot "llama")
-if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot "llama\llama-server.exe"))) { throw "llama-server.exe was not found after extraction." }
+Write-Step "llama.cpp server"
+& (Join-Path $resolvedRoot "scripts\install-llama-server.ps1") -Root $resolvedRoot
+if ($LASTEXITCODE -ne 0) { throw "llama-server installation failed." }
 Write-Ok "llama-server ready"
 
 Write-Step "uv package manager"

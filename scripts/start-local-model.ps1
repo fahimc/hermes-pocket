@@ -11,7 +11,6 @@ Set-StrictMode -Version Latest
 
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $runtimeRoot = Join-Path $resolvedRoot ".cache\runtimes\windows-x64"
-$serverPath = Join-Path $runtimeRoot "llama\llama-server.exe"
 $statePath = Join-Path $resolvedRoot "data\local-server.json"
 $configPath = Join-Path $resolvedRoot "data\config.yaml"
 $settingsPath = Join-Path $resolvedRoot "hermes-pocket.json"
@@ -28,12 +27,43 @@ if ($ContextSize -gt 0) { $configuredContext = $ContextSize }
 if ($configuredContext -lt 64000) { throw "context_size must be at least 64000 for Hermes Agent." }
 $ContextSize = $configuredContext
 
+function Get-Setting([string]$Name, $Default) {
+    if ($settings -and $settings.PSObject.Properties.Name -contains $Name -and $null -ne $settings.$Name) {
+        return $settings.$Name
+    }
+    return $Default
+}
+
+function Test-NvidiaGpu {
+    return $null -ne (Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue)
+}
+
+$useGpu = [bool](Get-Setting "use_gpu" $false)
+$gpuBackend = ([string](Get-Setting "gpu_backend" "cuda")).ToLowerInvariant()
+$fallbackToCpu = [bool](Get-Setting "gpu_fallback_to_cpu" $true)
+$backend = if ($useGpu -and $gpuBackend -eq "cuda") { "cuda" } else { "cpu" }
+if ($backend -eq "cuda" -and -not (Test-NvidiaGpu)) {
+    if ($fallbackToCpu) {
+        Write-Warning "GPU mode is enabled but nvidia-smi was not found. Using the CPU llama.cpp server."
+        $backend = "cpu"
+    } else {
+        throw "GPU mode is enabled, but nvidia-smi was not found and gpu_fallback_to_cpu is false."
+    }
+}
+$serverDirectory = if ($backend -eq "cuda") { "llama-cuda" } else { "llama" }
+$serverPath = Join-Path $runtimeRoot "$serverDirectory\llama-server.exe"
+$gpuLayers = [string](Get-Setting "gpu_layers" "all")
+$flashAttention = [bool](Get-Setting "flash_attention" $true)
+$parallel = [int](Get-Setting "parallel" 1)
+if ($parallel -lt 1) { throw "parallel must be at least 1." }
+
 function Stop-TrackedServer {
     if (-not (Test-Path -LiteralPath $statePath)) { return }
     try { $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json } catch { $state = $null }
     if ($state -and $state.pid) {
         $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($state.pid)" -ErrorAction SilentlyContinue
-        if ($processInfo -and $processInfo.ExecutablePath -and ((Resolve-Path -LiteralPath $processInfo.ExecutablePath).Path -ieq (Resolve-Path -LiteralPath $serverPath).Path)) {
+        $trackedServer = if ($state.server -and (Test-Path -LiteralPath $state.server)) { (Resolve-Path -LiteralPath $state.server).Path } else { $null }
+        if ($processInfo -and $processInfo.ExecutablePath -and $trackedServer -and ((Resolve-Path -LiteralPath $processInfo.ExecutablePath).Path -ieq $trackedServer)) {
             Stop-Process -Id ([int]$state.pid) -Force -ErrorAction SilentlyContinue
         }
     }
@@ -142,7 +172,21 @@ $port = Get-FreePort
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $stdoutPath = Join-Path $logDir "llama-server-$timestamp.out.log"
 $stderrPath = Join-Path $logDir "llama-server-$timestamp.err.log"
-$arguments = @("--model", $selected.FullName, "--host", "127.0.0.1", "--port", $port, "--ctx-size", $ContextSize, "--jinja", "--alias", $modelId)
+$arguments = @(
+    "--model", $selected.FullName,
+    "--host", "127.0.0.1",
+    "--port", $port,
+    "--ctx-size", $ContextSize,
+    "--parallel", $parallel,
+    "--jinja",
+    "--alias", $modelId
+)
+if ($backend -eq "cuda") {
+    $arguments += @("--n-gpu-layers", $gpuLayers)
+    if ($flashAttention) { $arguments += @("--flash-attn", "on") }
+} else {
+    $arguments += @("--n-gpu-layers", "0")
+}
 $process = Start-Process -FilePath $serverPath -ArgumentList $arguments -WorkingDirectory (Split-Path $serverPath) -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
 
 $ready = $false
@@ -166,9 +210,13 @@ Update-HermesConfig $modelId $port $ContextSize
     port = $port
     model = $selected.FullName
     model_id = $modelId
+    backend = $backend
+    context_size = $ContextSize
+    parallel = $parallel
     server = $serverPath
     started_at = (Get-Date).ToString("o")
 } | ConvertTo-Json | Set-Content -LiteralPath $statePath -Encoding utf8
 
 Write-Host "Local model ready: $($selected.Name)" -ForegroundColor Green
+Write-Host "Backend: $backend | Context: $ContextSize | Parallel slots: $parallel" -ForegroundColor DarkGray
 Write-Host "Hermes endpoint: http://127.0.0.1:$port/v1" -ForegroundColor DarkGray

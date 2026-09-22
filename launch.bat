@@ -8,7 +8,6 @@ set "RUNTIME_DIR=%PORTABLE_ROOT%\.cache\runtimes\windows-x64"
 set "SOURCE_DIR=%PORTABLE_ROOT%\src\hermes-agent"
 set "VENV_DIR=%RUNTIME_DIR%\venv"
 set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
-set "LLAMA_SERVER=%RUNTIME_DIR%\llama\llama-server.exe"
 
 if not exist "%RUNTIME_DIR%\ready.flag" (
     echo.
@@ -24,14 +23,12 @@ if not exist "%RUNTIME_DIR%\ready.flag" (
     )
 )
 
-if not exist "%LLAMA_SERVER%" (
-    echo The local llama.cpp server is missing. Installing it without changing the existing Hermes runtime...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\install-llama-server.ps1" -Root "%PORTABLE_ROOT%"
-    if errorlevel 1 (
-        echo Setup failed while installing llama.cpp.
-        pause
-        exit /b 1
-    )
+echo Checking the configured llama.cpp backend...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\install-llama-server.ps1" -Root "%PORTABLE_ROOT%"
+if errorlevel 1 (
+    echo Setup failed while installing the configured llama.cpp backend.
+    pause
+    exit /b 1
 )
 
 if not exist "%PYTHON_EXE%" (
