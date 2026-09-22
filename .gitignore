@@ -10,3 +10,6 @@ data/memories/
 data/skills/
 data/logs/
 data/state.db*
+data/local-server.json
+model/*.gguf
+models/*.gguf

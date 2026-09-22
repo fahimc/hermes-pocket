@@ -8,6 +8,7 @@ set "RUNTIME_DIR=%PORTABLE_ROOT%\.cache\runtimes\windows-x64"
 set "SOURCE_DIR=%PORTABLE_ROOT%\src\hermes-agent"
 set "VENV_DIR=%RUNTIME_DIR%\venv"
 set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
+set "LLAMA_SERVER=%RUNTIME_DIR%\llama\llama-server.exe"
 
 if not exist "%RUNTIME_DIR%\ready.flag" (
     echo.
@@ -18,6 +19,16 @@ if not exist "%RUNTIME_DIR%\ready.flag" (
     if errorlevel 1 (
         echo.
         echo Setup failed. Review the error above and run launch.bat again.
+        pause
+        exit /b 1
+    )
+)
+
+if not exist "%LLAMA_SERVER%" (
+    echo The local llama.cpp server is missing. Installing it without changing the existing Hermes runtime...
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\install-llama-server.ps1" -Root "%PORTABLE_ROOT%"
+    if errorlevel 1 (
+        echo Setup failed while installing llama.cpp.
         pause
         exit /b 1
     )
@@ -49,10 +60,21 @@ set "HOMEDRIVE="
 set "HOMEPATH="
 set "USERPROFILE=%PORTABLE_ROOT%\.cache\windows-userprofile"
 
+echo.
+echo Scanning portable model folders for GGUF models...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\start-local-model.ps1" -Root "%PORTABLE_ROOT%"
+if errorlevel 1 (
+    echo.
+    echo Local model startup failed. Hermes was not launched.
+    pause
+    exit /b 1
+)
+
 if not "%~1"=="" (
     "%PYTHON_EXE%" -m hermes_cli.main %*
 ) else (
     "%PYTHON_EXE%" -m hermes_cli.main
 )
 set "EXIT_CODE=%ERRORLEVEL%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\stop-local-model.ps1" -Root "%PORTABLE_ROOT%" >nul 2>&1
 endlocal & exit /b %EXIT_CODE%
