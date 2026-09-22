@@ -37,7 +37,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Release: https://github.com/fahimc/hermes-pocket/releases/tag/v0.1.0
 - Asset: `HermesPocket-win-x64.zip` (bootstrap folder, first-run setup required)
 - Follow-up release: `v0.2.0` adds model-folder discovery, local llama.cpp startup, and root context configuration.
-- Pending release: `v0.3.0` adds config-driven CUDA installation and GPU launch settings.
+- Release: `v0.3.0` adds config-driven CUDA installation and GPU launch settings; asset `HermesPocket-v0.3.0-win-x64.zip` is published.
 
 ## Known limitations
 
@@ -48,4 +48,4 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 
 ## Resume point
 
-For the next iteration, run a full 64k-context Hermes chat on suitable hardware, confirm the public v0.3.0 bootstrap asset, and add a cross-platform Unix launcher if needed.
+For the next iteration, run a full 64k-context Hermes chat on suitable hardware and add a cross-platform Unix launcher if needed.
