@@ -45,6 +45,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Follow-up release: `v0.2.0` adds model-folder discovery, local llama.cpp startup, and root context configuration.
 - Release: `v0.3.0` adds config-driven CUDA installation and GPU launch settings; asset `HermesPocket-v0.3.0-win-x64.zip` is published.
 - Release: `v0.4.0` adds portable Ollama installation, model management, combined model selection, and shared GPU configuration; asset `HermesPocket-v0.4.0-win-x64.zip` is published.
+- Release: `v0.4.3` publishes the response-cap and portable-Ollama thinking fix; asset `HermesPocket-v0.4.3-win-x64.zip` is published.
 
 ## Known limitations
 
