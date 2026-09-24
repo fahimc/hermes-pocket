@@ -95,6 +95,11 @@ Write-Step "llama.cpp server"
 if ($LASTEXITCODE -ne 0) { throw "llama-server installation failed." }
 Write-Ok "llama-server ready"
 
+Write-Step "Portable Ollama"
+& (Join-Path $resolvedRoot "scripts\install-ollama.ps1") -Root $resolvedRoot
+if ($LASTEXITCODE -ne 0) { throw "Ollama installation failed." }
+Write-Ok "Ollama ready"
+
 Write-Step "uv package manager"
 $uvArchive = Join-Path $downloadRoot "uv.zip"
 Download-Asset $uvUrl $uvArchive

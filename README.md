@@ -10,20 +10,22 @@ This project is a clean launcher and runtime bootstrap inspired by the public
 1. Download the latest release zip and extract it to a writable folder or USB drive.
 2. Double-click `launch.bat`.
 3. On first run, allow setup to download the local runtimes and Hermes dependencies.
-4. Put one or more `.gguf` files in `model\` or `models\`. With one file, it is selected automatically; with multiple files, the launcher shows a menu.
-5. Hermes Pocket starts the local llama.cpp server, updates `data\config.yaml`, and then launches Hermes against that model.
+4. Put one or more `.gguf` files in `model\` or `models\`, or install Ollama models with `ollama-model.cmd pull <model-name>`.
+5. Hermes Pocket shows one combined picker containing local GGUF files and registered portable Ollama models, starts the selected backend, updates `data\config.yaml`, and launches Hermes against that model.
 
 The first setup downloads roughly 1–1.6 GB when the CUDA bundle is enabled (less in CPU-only mode), depending on dependency and browser caches. Later launches use only the portable folder.
 
 ## Local llama.cpp / Llama Pocket
 
-Hermes Agent cannot consume a `.gguf` file as a model endpoint by itself. Hermes Pocket therefore downloads the official `llama-server.exe` bundle once, scans the portable model folders, starts a server for the selected model on a free localhost port, and writes the custom OpenAI-compatible provider into `data\config.yaml` before starting Hermes. When Hermes exits, the launcher stops only the server process it started. On a CUDA-capable NVIDIA machine, the default config downloads and uses the CUDA 13.3 x64 bundle; the CPU bundle remains available as a fallback.
+Hermes Agent cannot consume a `.gguf` file as a model endpoint by itself. Hermes Pocket therefore downloads the official `llama-server.exe` bundle once, scans the portable model folders, and exposes each selected GGUF through a local OpenAI-compatible endpoint. It also downloads a standalone Ollama runtime, stores its models in `ollamamodel\`, and includes Ollama's registered `/api/tags` models in the same picker. The selected endpoint is written into `data\config.yaml` before Hermes starts; when Hermes exits, the launcher stops only the model server process it started. On a CUDA-capable NVIDIA machine, the default config downloads and uses the CUDA 13.3 x64 llama.cpp bundle, and Ollama uses its GPU runtime automatically. Set `use_gpu` to `false` to force CPU mode for both backends.
 
 Environment overrides:
 
 - `HERMES_MODELS_DIR`: scan a different model directory instead of the portable `model\` and `models\` folders.
-- `HERMES_MODEL`: select a specific filename without showing the menu.
-- `hermes-pocket.json`: root config file. Set `model_directory` and `context_size` here; the default is `model` and 65536 tokens. Hermes currently requires at least 64000 tokens for the main agent model. GPU settings are `use_gpu`, `gpu_backend`, `gpu_layers`, `flash_attention`, `parallel`, and `gpu_fallback_to_cpu`. Set `use_gpu` to `false` for CPU-only mode. `parallel: 1` is intentional for a 64k context because each additional slot increases KV-cache memory.
+- `HERMES_MODEL`: select a specific GGUF filename or Ollama model name without showing the menu. Prefix an Ollama name with `ollama:` when needed.
+- `hermes-pocket.json`: root config file. Set `model_directory` and `context_size` here; the default is `model` and 65536 tokens. Hermes currently requires at least 64000 tokens for the main agent model. GPU settings are `use_gpu`, `gpu_backend`, `gpu_layers`, `flash_attention`, `parallel`, and `gpu_fallback_to_cpu`. Set `use_gpu` to `false` to force CPU mode for llama.cpp and Ollama. `parallel: 1` is intentional for a 64k context because each additional slot increases KV-cache memory.
+- `ollama.enabled`, `ollama.executable_path`, `ollama.models_directory`, and `ollama.port` control the portable Ollama runtime. The default model store is `ollamamodel\`; loose files placed there are not Ollama models until imported or pulled through Ollama.
+- `ollama-model.cmd list`: list registered portable Ollama models. Use `ollama-model.cmd pull qwen3:8b` to download one, or pass another Ollama command such as `run` or `create`.
 - `HERMES_CONTEXT_SIZE`: temporary environment override when no `context_size` is set in the root config.
 
 This also works with a running Llama Pocket/llama.cpp server if you configure Hermes manually, but the default launch path is now fully local and model-folder driven.
@@ -35,6 +37,8 @@ hermes-pocket/
 ├── launch.bat             # Windows launcher
 ├── model/                 # place GGUF files here (not committed)
 ├── models/                # alternate model folder (not committed)
+├── ollamamodel/           # portable Ollama model store (not committed)
+├── ollama-model.cmd       # portable Ollama model manager
 ├── scripts/               # first-run setup and reset helpers
 ├── data/                  # private Hermes home; keep this backed up
 ├── src/                   # downloaded Hermes source (ignored by Git)

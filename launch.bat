@@ -30,6 +30,13 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+echo Checking the configured Ollama backend...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PORTABLE_ROOT%\scripts\install-ollama.ps1" -Root "%PORTABLE_ROOT%"
+if errorlevel 1 (
+    echo Setup failed while installing the configured Ollama backend.
+    pause
+    exit /b 1
+)
 
 if not exist "%PYTHON_EXE%" (
     echo [ERROR] Portable Python environment is missing. Delete .cache and retry setup.

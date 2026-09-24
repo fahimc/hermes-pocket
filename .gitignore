@@ -13,3 +13,5 @@ data/state.db*
 data/local-server.json
 model/*.gguf
 models/*.gguf
+ollamamodel/*
+!ollamamodel/.gitkeep

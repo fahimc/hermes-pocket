@@ -18,6 +18,7 @@ The setup script downloads these independent upstream distributions into
 - ripgrep
 - MinGit
 - Playwright Chromium, when available
+- Ollama standalone Windows x64 runtime, when enabled in `hermes-pocket.json`
 
 Each project retains its own license and notices in the downloaded files.
 
