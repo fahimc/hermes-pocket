@@ -33,6 +33,31 @@ function Remove-GeneratedModelConfig {
     if ($end -lt $lines.Count) { $after = @($lines[$end..($lines.Count - 1)]) }
     Set-Content -LiteralPath $configPath -Value (($before + $after) -join [Environment]::NewLine) -Encoding utf8
 }
+
+function Remove-ManagedOllamaProvider {
+    $configPath = Join-Path $resolvedRoot "data\config.yaml"
+    if (-not (Test-Path -LiteralPath $configPath)) { return }
+    $lines = @(Get-Content -LiteralPath $configPath)
+    $start = -1
+    $end = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\s*-\s+name:\s+hermes-pocket-ollama\s*$') {
+            $start = $i
+            $end = $i + 1
+            while ($end -lt $lines.Count -and (
+                    [string]::IsNullOrWhiteSpace($lines[$end]) -or
+                    $lines[$end] -match '^\s' -and $lines[$end] -notmatch '^\s*-\s+name:\s')) {
+                $end++
+            }
+            break
+        }
+    }
+    if ($start -lt 0) { return }
+    $before = @(); $after = @()
+    if ($start -gt 0) { $before = @($lines[0..($start - 1)]) }
+    if ($end -lt $lines.Count) { $after = @($lines[$end..($lines.Count - 1)]) }
+    Set-Content -LiteralPath $configPath -Value (($before + $after) -join [Environment]::NewLine) -Encoding utf8
+}
 if ($state.pid -and $state.server) {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($state.pid)"
     if ($processInfo -and $processInfo.ExecutablePath -and ((Resolve-Path -LiteralPath $processInfo.ExecutablePath).Path -ieq (Resolve-Path -LiteralPath $state.server).Path)) {
@@ -42,3 +67,4 @@ if ($state.pid -and $state.server) {
 }
 Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue
 Remove-GeneratedModelConfig
+Remove-ManagedOllamaProvider

@@ -1,6 +1,7 @@
 {
   "model_directory": "model",
   "context_size": 65536,
+  "max_output_tokens": 16384,
   "model_port": 11435,
   "use_gpu": true,
   "gpu_backend": "cuda",
@@ -12,6 +13,7 @@
     "enabled": true,
     "executable_path": ".cache/runtimes/windows-x64/ollama/ollama.exe",
     "models_directory": "ollamamodel",
-    "port": 11434
+    "port": 11434,
+    "disable_thinking": true
   }
 }
