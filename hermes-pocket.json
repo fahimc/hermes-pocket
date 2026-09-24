@@ -1,6 +1,7 @@
 {
   "model_directory": "model",
   "context_size": 65536,
+  "model_port": 11435,
   "use_gpu": true,
   "gpu_backend": "cuda",
   "gpu_layers": "all",

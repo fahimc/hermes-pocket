@@ -7,12 +7,31 @@ param(
 $ErrorActionPreference = "SilentlyContinue"
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $statePath = Join-Path $resolvedRoot "data\local-server.json"
-if (-not (Test-Path -LiteralPath $statePath)) { exit 0 }
-$state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+$state = $null
+if (Test-Path -LiteralPath $statePath) { $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json }
 function Stop-ProcessTree([int]$ProcessId) {
     $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue)
     foreach ($child in $children) { Stop-ProcessTree ([int]$child.ProcessId) }
     Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Remove-GeneratedModelConfig {
+    $configPath = Join-Path $resolvedRoot "data\config.yaml"
+    if (-not (Test-Path -LiteralPath $configPath)) { return }
+    $lines = @(Get-Content -LiteralPath $configPath)
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^model:\s*$') { $start = $i; break }
+    }
+    if ($start -lt 0) { return }
+    $end = $start + 1
+    while ($end -lt $lines.Count -and ($lines[$end] -match '^\s' -or [string]::IsNullOrWhiteSpace($lines[$end]))) { $end++ }
+    $modelBlock = ($lines[$start..($end - 1)] -join [Environment]::NewLine)
+    if ($modelBlock -notmatch '(?m)^\s+provider:\s+custom\s*$' -or $modelBlock -notmatch '(?m)^\s+base_url:\s+http://127\.0\.0\.1:') { return }
+    $before = @(); $after = @()
+    if ($start -gt 0) { $before = @($lines[0..($start - 1)]) }
+    if ($end -lt $lines.Count) { $after = @($lines[$end..($lines.Count - 1)]) }
+    Set-Content -LiteralPath $configPath -Value (($before + $after) -join [Environment]::NewLine) -Encoding utf8
 }
 if ($state.pid -and $state.server) {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($state.pid)"
@@ -21,4 +40,5 @@ if ($state.pid -and $state.server) {
         Write-Host "Stopped local model server (PID $($state.pid))."
     }
 }
-Remove-Item -LiteralPath $statePath -Force
+Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue
+Remove-GeneratedModelConfig

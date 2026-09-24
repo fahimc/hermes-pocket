@@ -38,6 +38,8 @@ elseif ($env:HERMES_CONTEXT_SIZE) { $configuredContext = [int]$env:HERMES_CONTEX
 if ($ContextSize -gt 0) { $configuredContext = $ContextSize }
 if ($configuredContext -lt 64000) { throw "context_size must be at least 64000 for Hermes Agent." }
 $ContextSize = $configuredContext
+$modelPreferredPort = [int](Get-Setting "model_port" 11435)
+if ($modelPreferredPort -lt 1 -or $modelPreferredPort -gt 65535) { throw "model_port must be an integer from 1 to 65535." }
 
 $useGpu = [bool](Get-Setting "use_gpu" $false)
 $gpuBackend = ([string](Get-Setting "gpu_backend" "cuda")).ToLowerInvariant()
@@ -275,7 +277,7 @@ if ($selected.source -eq "ollama") {
     }
     $modelId = [System.IO.Path]::GetFileNameWithoutExtension($selected.file.Name) -replace '[^A-Za-z0-9._:-]', '-'
     if ([string]::IsNullOrWhiteSpace($modelId)) { $modelId = "local" }
-    $port = Get-AvailablePort 0
+    $port = Get-AvailablePort $modelPreferredPort
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $stdoutPath = Join-Path $logDir "llama-server-$timestamp.out.log"
     $stderrPath = Join-Path $logDir "llama-server-$timestamp.err.log"
