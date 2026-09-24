@@ -34,6 +34,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - The CUDA server started successfully for `Spark-X2.5-4B-Q4_K_M.gguf` with `context_size: 65536`, `parallel: 1`, `--n-gpu-layers all`, and `--flash-attn on`; a direct 16-token request measured about 82 tokens/second on the RTX 3060.
 - The combined picker started portable Ollama on an available localhost port, discovered registered models from the reference Ollama store, selected `maternion/spark-x2.5-heretic:4b`, and wrote an `ollama-gpu` Hermes endpoint with context size 65536. `ollama-model.cmd list` also returned the two registered models. The manager and launcher cleanup stopped only their own Ollama process trees.
 - Diagnosed a user-facing `APIConnectionError` as Hermes retrying a dead localhost endpoint: `data/config.yaml` referenced a previously stopped dynamic port (`127.0.0.1:56768/v1`) while no matching local server state/process existed. Fixed GGUF startup to prefer stable `model_port: 11435` and changed shutdown to remove the generated `model:` provider block, preventing stale endpoint reuse. Verified CUDA GGUF health on port 11435 and cleanup of both state and generated config.
+- Fixed double-click behavior for `ollama-model.cmd` by replacing the usage-and-exit branch with an interactive manager for listing installed models, downloading models, importing Modelfiles, and exiting; command-line modes remain supported.
 
 ## Release
 
@@ -51,7 +52,8 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - The release is a folder/launcher, not a single native executable, because Hermes depends on Python, Node, browser tooling, and its own source tree.
 - A full agent response at 65536 context was not completed in this environment because a reasoning-heavy CPU inference run exceeded the interactive test window; CUDA server readiness, GPU launch flags, direct short request, Ollama discovery, and endpoint/config wiring passed.
 - A manually started Hermes process can still retain an in-memory old endpoint if its model server is stopped externally; restart it through `launch.bat` after recovery rather than using a stale `data/config.yaml` directly.
+- The interactive Ollama manager opens a server-backed command for each menu operation and cleans up the portable server it started.
 
 ## Resume point
 
-For the next iteration, run a full 64k-context Hermes chat against both backends on suitable hardware and add a cross-platform Unix launcher if needed.
+For the next iteration, publish a follow-up release if the interactive Ollama manager should be included in the downloadable ZIP; then run a full 64k-context Hermes chat against both backends on suitable hardware and add a cross-platform Unix launcher if needed.

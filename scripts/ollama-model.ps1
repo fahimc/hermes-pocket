@@ -73,40 +73,84 @@ function Start-Server {
     throw "Portable Ollama did not become ready."
 }
 
-if (-not $Command -or $Command.Count -eq 0) {
-    Write-Host "Usage: ollama-model.cmd list"
-    Write-Host "       ollama-model.cmd pull <model-name>"
-    Write-Host "       ollama-model.cmd run <model-name>"
-    Write-Host "       ollama-model.cmd create <name> -f <Modelfile>"
-    exit 0
+function Invoke-OllamaCommand([string[]]$Arguments) {
+    $runtime = $null
+    $ownsServer = $false
+    try {
+        if (Test-Path -LiteralPath $statePath) {
+            try {
+                $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+                if ($state.source -eq "ollama" -and $state.port -and $state.server -and ((Resolve-Path -LiteralPath $state.server -ErrorAction Stop).Path -ieq (Resolve-Path -LiteralPath $executable).Path)) {
+                    if ((Invoke-WebRequest "http://127.0.0.1:$($state.port)/api/version" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) {
+                        $runtime = [pscustomobject]@{ Process = $null; Port = [int]$state.port }
+                    }
+                }
+            } catch { $runtime = $null }
+        }
+        if (-not $runtime) { $runtime = Start-Server; $ownsServer = $true }
+
+        $savedHost = $env:OLLAMA_HOST
+        $savedModels = $env:OLLAMA_MODELS
+        $savedContext = $env:OLLAMA_CONTEXT_LENGTH
+        $savedLibrary = $env:OLLAMA_LLM_LIBRARY
+        try {
+            $env:OLLAMA_HOST = "127.0.0.1:$($runtime.Port)"
+            $env:OLLAMA_MODELS = $modelsPath
+            $env:OLLAMA_CONTEXT_LENGTH = [string]$contextSize
+            if ([bool]$settings.use_gpu) { Remove-Item Env:OLLAMA_LLM_LIBRARY -ErrorAction SilentlyContinue } else { $env:OLLAMA_LLM_LIBRARY = "cpu" }
+            & $executable @Arguments
+            $commandExitCode = [int]$LASTEXITCODE
+            if ($commandExitCode -ne 0) { throw "Ollama command failed with exit code $commandExitCode." }
+        } finally {
+            if ($null -eq $savedHost) { Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue } else { $env:OLLAMA_HOST = $savedHost }
+            if ($null -eq $savedModels) { Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue } else { $env:OLLAMA_MODELS = $savedModels }
+            if ($null -eq $savedContext) { Remove-Item Env:OLLAMA_CONTEXT_LENGTH -ErrorAction SilentlyContinue } else { $env:OLLAMA_CONTEXT_LENGTH = $savedContext }
+            if ($null -eq $savedLibrary) { Remove-Item Env:OLLAMA_LLM_LIBRARY -ErrorAction SilentlyContinue } else { $env:OLLAMA_LLM_LIBRARY = $savedLibrary }
+        }
+    } finally {
+        if ($ownsServer -and $runtime -and $runtime.Process) { Stop-ProcessTree $runtime.Process.Id }
+    }
 }
 
-$runtime = $null
-$ownsServer = $false
-try {
-    if (Test-Path -LiteralPath $statePath) {
+function Invoke-InteractiveManager {
+    while ($true) {
+        Write-Host ""
+        Write-Host "Portable Ollama model manager"
+        Write-Host "Models folder: $modelsPath"
+        Write-Host "1. List installed models"
+        Write-Host "2. Download a model"
+        Write-Host "3. Import from a Modelfile"
+        Write-Host "4. Exit"
+
+        $choice = (Read-Host "Choose 1-4").Trim()
+        if ($choice -eq "4" -or $choice -ieq "exit") { break }
+
         try {
-            $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
-            if ($state.source -eq "ollama" -and $state.port -and $state.server -and ((Resolve-Path -LiteralPath $state.server -ErrorAction Stop).Path -ieq (Resolve-Path -LiteralPath $executable).Path)) {
-                if ((Invoke-WebRequest "http://127.0.0.1:$($state.port)/api/version" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) {
-                    $runtime = [pscustomobject]@{ Process = $null; Port = [int]$state.port }
-                }
+            if ($choice -eq "1") {
+                Invoke-OllamaCommand @("list")
+            } elseif ($choice -eq "2") {
+                $name = (Read-Host "Model name (for example qwen3:8b)").Trim()
+                if ($name) { Invoke-OllamaCommand @("pull", $name) }
+            } elseif ($choice -eq "3") {
+                $name = (Read-Host "New model name").Trim()
+                $file = (Read-Host "Modelfile path").Trim().Trim('"')
+                if ($name -and $file) { Invoke-OllamaCommand @("create", $name, "-f", $file) }
+            } else {
+                Write-Host "Choose one of the numbered options."
             }
-        } catch { $runtime = $null }
+        } catch {
+            Write-Host "Operation failed: $($_.Exception.Message)" -ForegroundColor Red
+        }
     }
-    if (-not $runtime) { $runtime = Start-Server; $ownsServer = $true }
-    $savedHost = $env:OLLAMA_HOST; $savedModels = $env:OLLAMA_MODELS; $savedContext = $env:OLLAMA_CONTEXT_LENGTH
+}
+
+if (-not $Command -or $Command.Count -eq 0) {
+    Invoke-InteractiveManager
+} else {
     try {
-        $env:OLLAMA_HOST = "127.0.0.1:$($runtime.Port)"
-        $env:OLLAMA_MODELS = $modelsPath
-        $env:OLLAMA_CONTEXT_LENGTH = [string]$contextSize
-        & $executable @Command
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    } finally {
-        if ($null -eq $savedHost) { Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue } else { $env:OLLAMA_HOST = $savedHost }
-        if ($null -eq $savedModels) { Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue } else { $env:OLLAMA_MODELS = $savedModels }
-        if ($null -eq $savedContext) { Remove-Item Env:OLLAMA_CONTEXT_LENGTH -ErrorAction SilentlyContinue } else { $env:OLLAMA_CONTEXT_LENGTH = $savedContext }
+        Invoke-OllamaCommand $Command
+    } catch {
+        Write-Error $_.Exception.Message
+        exit 1
     }
-} finally {
-    if ($ownsServer -and $runtime -and $runtime.Process) { Stop-ProcessTree $runtime.Process.Id }
 }
