@@ -14,6 +14,6 @@
     "executable_path": ".cache/runtimes/windows-x64/ollama/ollama.exe",
     "models_directory": "ollamamodel",
     "port": 11434,
-    "disable_thinking": true
+    "disable_thinking": false
   }
 }

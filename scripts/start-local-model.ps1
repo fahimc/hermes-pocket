@@ -77,7 +77,7 @@ $ollamaEnabled = [bool](Get-OllamaSetting "enabled" $true)
 $ollamaExecutableSetting = [string](Get-OllamaSetting "executable_path" ".cache/runtimes/windows-x64/ollama/ollama.exe")
 $ollamaModelsSetting = [string](Get-OllamaSetting "models_directory" "ollamamodel")
 $ollamaPreferredPort = [int](Get-OllamaSetting "port" 11434)
-$disableOllamaThinking = [bool](Get-OllamaSetting "disable_thinking" $true)
+$disableOllamaThinking = [bool](Get-OllamaSetting "disable_thinking" $false)
 $ollamaExecutable = if ([IO.Path]::IsPathRooted($ollamaExecutableSetting)) { $ollamaExecutableSetting } else { Join-Path $resolvedRoot $ollamaExecutableSetting }
 $ollamaModelsPath = if ([IO.Path]::IsPathRooted($ollamaModelsSetting)) { $ollamaModelsSetting } else { Join-Path $resolvedRoot $ollamaModelsSetting }
 
@@ -218,7 +218,7 @@ function Select-Model([object[]]$Candidates) {
     return $Candidates[$parsed - 1]
 }
 
-function Update-HermesConfig([string]$ModelId, [int]$Port, [int]$Context, [int]$MaxOutput) {
+function Update-HermesConfig([string]$ModelId, [int]$Port, [int]$Context) {
     $lines = @()
     if (Test-Path -LiteralPath $configPath) { $lines = @(Get-Content -LiteralPath $configPath) }
     $replacement = @(
@@ -227,8 +227,7 @@ function Update-HermesConfig([string]$ModelId, [int]$Port, [int]$Context, [int]$
         "  provider: custom",
         "  base_url: http://127.0.0.1:$Port/v1",
         "  api_mode: chat_completions",
-        "  context_length: $Context",
-        "  max_tokens: $MaxOutput"
+        "  context_length: $Context"
     )
     $start = -1
     for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -248,38 +247,38 @@ function Update-HermesConfig([string]$ModelId, [int]$Port, [int]$Context, [int]$
     Set-Content -LiteralPath $configPath -Value ($lines -join [Environment]::NewLine) -Encoding utf8
 }
 
-function Update-ManagedOllamaProvider([string]$ModelId, [int]$Port, [int]$Context, [bool]$DisableThinking) {
+function Update-ManagedLocalProvider([string]$ModelId, [int]$Port, [int]$Context, [int]$MaxOutput, [bool]$IsOllama, [bool]$DisableThinking) {
     $lines = @(Get-Content -LiteralPath $configPath)
-    $managedStart = -1
-    $managedEnd = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -match '^\s*-\s+name:\s+hermes-pocket-ollama\s*$') {
-            $managedStart = $i
-            $managedEnd = $i + 1
-            while ($managedEnd -lt $lines.Count -and (
-                    [string]::IsNullOrWhiteSpace($lines[$managedEnd]) -or
-                    $lines[$managedEnd] -match '^\s' -and $lines[$managedEnd] -notmatch '^\s*-\s+name:\s')) {
-                $managedEnd++
+    while ($true) {
+        $managedStart = -1
+        $managedEnd = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\s*-\s+name:\s+hermes-pocket-(?:ollama|gguf)\s*$') {
+                $managedStart = $i
+                $managedEnd = $i + 1
+                while ($managedEnd -lt $lines.Count -and (
+                        [string]::IsNullOrWhiteSpace($lines[$managedEnd]) -or
+                        $lines[$managedEnd] -match '^\s' -and $lines[$managedEnd] -notmatch '^\s*-\s+name:\s')) {
+                    $managedEnd++
+                }
+                break
             }
-            break
         }
-    }
-    if ($managedStart -ge 0) {
+        if ($managedStart -lt 0) { break }
         $before = @(); $after = @()
         if ($managedStart -gt 0) { $before = @($lines[0..($managedStart - 1)]) }
         if ($managedEnd -lt $lines.Count) { $after = @($lines[$managedEnd..($lines.Count - 1)]) }
         $lines = @($before + $after)
     }
 
-    $extraBody = @(
-        "      options:"
-        "        num_ctx: $Context"
-    )
-    if ($DisableThinking) {
-        $extraBody = @("      think: false") + $extraBody
+    $providerName = if ($IsOllama) { "hermes-pocket-ollama" } else { "hermes-pocket-gguf" }
+    $extraBody = @("      max_tokens: $MaxOutput")
+    if ($IsOllama) {
+        if ($DisableThinking) { $extraBody += "      think: false" }
+        $extraBody += @("      options:", "        num_ctx: $Context")
     }
     $entry = @(
-        "  - name: hermes-pocket-ollama",
+        "  - name: $providerName",
         "    base_url: http://127.0.0.1:$Port/v1",
         "    model: $ModelId",
         "    api_mode: chat_completions",
@@ -376,10 +375,8 @@ if ($selected.source -eq "ollama") {
     $serverPath = $llamaServerPath
 }
 
-Update-HermesConfig $modelId $port $ContextSize $maxOutputTokens
-if ($selected.source -eq "ollama") {
-    Update-ManagedOllamaProvider $modelId $port $ContextSize $disableOllamaThinking
-}
+Update-HermesConfig $modelId $port $ContextSize
+Update-ManagedLocalProvider $modelId $port $ContextSize $maxOutputTokens ($selected.source -eq "ollama") $disableOllamaThinking
 @{
     pid = $process.Id
     port = $port

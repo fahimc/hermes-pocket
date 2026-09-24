@@ -36,6 +36,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - Diagnosed a user-facing `APIConnectionError` as Hermes retrying a dead localhost endpoint: `data/config.yaml` referenced a previously stopped dynamic port (`127.0.0.1:56768/v1`) while no matching local server state/process existed. Fixed GGUF startup to prefer stable `model_port: 11435` and changed shutdown to remove the generated `model:` provider block, preventing stale endpoint reuse. Verified CUDA GGUF health on port 11435 and cleanup of both state and generated config.
 - Fixed double-click behavior for `ollama-model.cmd` by replacing the usage-and-exit branch with an interactive manager for listing installed models, downloading models, importing Modelfiles, and exiting; command-line modes remain supported.
 - Diagnosed response truncation in the portable Ollama path: its dynamic loopback port was not recognized as an Ollama endpoint, so `think:false` was omitted and the high-reasoning agent consumed roughly 41k generated tokens until the 65536-token context filled. Added root `max_output_tokens` (default 16384), generated `max_tokens`, and a managed custom-provider route that sends `think:false` (configurable through `ollama.disable_thinking`) plus `options.num_ctx` to the actual portable Ollama port.
+- Follow-up correction: the pinned Hermes CLI intentionally ignores `model.max_tokens`, so v0.4.3's generated field did not actually cap Ollama output; turning thinking off was masking the issue. The launcher now defaults `ollama.disable_thinking` to false and places `max_tokens` in the matching custom provider's `extra_body`, which the OpenAI SDK merges into the top-level request. It generates a corresponding cap for the GGUF provider. Ollama's `/v1/chat/completions` honored top-level `max_tokens` in a live request; `options.num_predict` did not cap generation on that endpoint.
 
 ## Release
 
@@ -56,6 +57,7 @@ Create a USB-friendly launcher for Hermes Agent that keeps its runtime, source, 
 - A manually started Hermes process can still retain an in-memory old endpoint if its model server is stopped externally; restart it through `launch.bat` after recovery rather than using a stale `data/config.yaml` directly.
 - The interactive Ollama manager opens a server-backed command for each menu operation and cleans up the portable server it started.
 - The new response cap and Ollama thinking control take effect when the portable launcher is restarted; an already-running Hermes process retains its in-memory request configuration.
+- The live model has no named thinking-level metadata in `/api/show`. Its thinking is therefore enabled through Hermes' `reasoning_effort`, and the output cap bounds a single response, including reasoning. If all output tokens are spent on reasoning with no answer, Hermes' truncation recovery retries the answer with thinking off for that retry.
 
 ## Resume point
 
